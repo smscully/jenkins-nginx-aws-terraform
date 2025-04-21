@@ -1,0 +1,123 @@
+#!/bin/bash
+
+# Regresh package index, install latest versions of packages, and delete obsolete packages
+apt update -y
+apt upgrade -y
+apt autoremove
+
+# Configure unattended-upgrades
+apt install unattended-upgrades -y
+systemctl is-enabled --quiet unattended-upgrades || systemctl enable unattended-upgrades
+systemctl is-active --quiet unattended-upgrades || systemctl start unattended-upgrades
+# Attempt to auto fix if issues with upgrades
+sed -i '/\/\/Unattended-Upgrade::AutoFixInterruptedDpkg "true";/c\Unattended-Upgrade::AutoFixInterruptedDpkg "true";' /etc/apt/apt.conf.d/50unattended-upgrades
+# Remove unused dependencies
+sed -i '/\/\/Unattended-Upgrade::Remove-Unused-Dependencies "false";/c\Unattended-Upgrade::Remove-Unused-Dependencies "true";' /etc/apt/apt.conf.d/50unattended-upgrades
+# Reboot if required for upgrade
+sed -i '/\/\/Unattended-Upgrade::Automatic-Reboot "false";/c\Unattended-Upgrade::Automatic-Reboot "true";' /etc/apt/apt.conf.d/50unattended-upgrades
+# Reboot even if users are logged in
+sed -i '/\/\/Unattended-Upgrade::Automatic-Reboot-WithUsers "true";/c\Unattended-Upgrade::Automatic-Reboot-WithUsers "true";' /etc/apt/apt.conf.d/50unattended-upgrades
+# Set reboot time to 03:00 AM
+sed -i '/\/\/Unattended-Upgrade::Automatic-Reboot-Time "02:00";/c\Unattended-Upgrade::Automatic-Reboot-Time "03:00";' /etc/apt/apt.conf.d/50unattended-upgrades
+systemctl restart unattended-upgrades
+
+# Create SSH user, copy SSH keys and known_hosts, and add sudoers permissions
+adduser ssh_ubuntu
+usermod -amG sudoers ssh_ubuntu
+cp -r /home/ubuntu/.ssh /home/ssh_ubuntu/
+chown -R ssh_ubuntu:ssh_ubuntu /home/ssh_ubuntu/.ssh
+echo "ssh_ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/ssh_ubuntu
+
+# Update sshd_config settings to increase security
+echo "Port ${ssh_port}" >> /etc/ssh/sshd_config
+echo -e "AllowUsers ubuntu@${ssh_ip} ssh_ubuntu@${ssh_ip}" >> /etc/ssh/sshd_config
+echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+systemctl restart sshd
+
+# Configure UFW
+ufw allow 80
+ufw allow 443
+ufw allow from ${ssh_ip} proto tcp to any port ${ssh_port}
+ufw --force enable 
+
+# Enable and start AppArmor
+systemctl is-enabled --quiet apparmor || systemctl enable apparmor
+systemctl is-active --quiet apparmor || systemctl start apparmor
+
+# Set hostname and local DNS
+hostnamectl set-hostname jenkins
+echo "127.0.0.10 jenkins" >> /etc/hosts
+
+# Install Jenkins and Java (dependency)
+# Reference: https://pkg.jenkins.io/debian 
+wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
+  https://pkg.jenkins.io/debian binary/ | tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+apt update -y
+apt install fontconfig openjdk-21-jre -y
+apt install jenkins -y
+systemctl is-enabled --quiet jenkins || systemctl enable jenkins
+systemctl is-active --quiet jenkins || systemctl start jenkins
+
+# Install Git
+apt install git -y
+
+# Install Terraform
+# Reference: https://developer.hashicorp.com/terraform/install
+wget -O - https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg]" \
+  https://apt.releases.hashicorp.com $(lsb_release -cs) main | tee \
+  /etc/apt/sources.list.d/hashicorp.list > /dev/null
+apt update -y && apt install terraform -y
+
+# Install kubectl
+curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.23.6/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
+
+# Install nginx
+apt install nginx -y
+systemctl is-enabled --quiet nginx || systemctl enable nginx
+systemctl is-active --quiet nginx || systemctl start nginx
+# Configure nginx as a reverse proxy
+cat > /etc/nginx/sites-enabled/default << EOF
+server {
+
+    listen 80 default_server;
+    server_name ${domain_name};
+
+    location / {
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version  1.1;
+        proxy_request_buffering  off;
+        proxy_buffering  off;
+        proxy_pass http://localhost:8080;
+        proxy_redirect http://localhost:8080 https://${domain_name};
+    }
+}
+EOF
+systemctl reload nginx
+
+# Install and configure Certbot for SSL/TLS certificate
+apt install certbot -y
+apt install python3-certbot-nginx -y
+certbot --nginx --non-interactive -d ${domain_name} -m ${certbot_email} --agree-tos
+
+# Install and configure Fail2ban
+apt install fail2ban -y
+systemctl is-enabled --quiet fail2ban || systemctl enable fail2ban
+systemctl is-active --quiet fail2ban || systemctl start fail2ban
+# SSH jail
+cat > /etc/fail2ban/jail.d/sshd.local << EOF
+[sshd]
+enabled = true
+port = ${ssh_port} 
+backend = systemd
+EOF
+systemctl restart fail2ban

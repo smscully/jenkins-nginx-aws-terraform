@@ -1,0 +1,186 @@
+#!/bin/bash
+
+# Regresh package index, install latest versions of packages, and delete obsolete packages
+yum upgrade -y
+
+# Configure dnf-automatic 
+yum install dnf-automatic -y
+systemctl is-enabled --quiet dnf-automatic.timer || systemctl enable dnf-automatic.timer
+systemctl is-active --quiet dnf-automatic.timer || systemctl start dnf-automatic.timer
+# Limit upgrades to security
+sed -i '/upgrade_type = default/c\upgrade_type = security' /etc/dnf/automatic.conf
+# Apply updates after downloaded
+sed -i '/apply_updates = no/c\apply_updates = yes' /etc/dnf/automatic.conf
+# Set dnf-automatic time to 03:00 AM
+sed -i '/OnCalendar=\*-\*-\* 6:00/c\OnCalendar=\*-\*-\* 3:00' /usr/lib/systemd/system/dnf-automatic.timer
+
+# Create SSH user, copy SSH keys and known_hosts, and add sudoers permissions
+adduser ssh_al
+usermod -amG sudoers ssh_al
+cp -r /home/ec2-user/.ssh /home/ssh_al/
+chown -R ssh_al:ssh_al /home/ssh_al/.ssh
+echo "ssh_al ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/ssh_al
+
+# Update sshd_config settings to increase security
+echo "Port ${ssh_port}" >> /etc/ssh/sshd_config
+echo -e "AllowUsers ec2-user@${ssh_ip} ssh_al@${ssh_ip}" >> /etc/ssh/sshd_config
+echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+echo "PermitRootLogin no" >> /etc/ssh/sshd_config
+systemctl restart sshd
+
+# Configure nftables
+yum install nftables -y
+systemctl enable nftables
+systemctl start nftables
+# Create nftables config file
+cat > /etc/sysconfig/jenkins.nft << EOF
+flush ruleset
+
+table inet jenkins_table {
+
+    counter cnt_ssh_new {
+    }
+
+    counter cnt_http_new {
+    }
+
+    chain jenkins_input {
+        type filter hook input priority 0; policy accept;
+        iif lo counter accept
+        ct state vmap {
+            established : jump jenkins_est,
+            related : jump jenkins_rel,
+            invalid : jump jenkins_inv,
+            new : jump jenkins_new
+        }
+        counter drop
+    }
+
+    chain jenkins_est {
+        counter accept
+    }
+
+    chain jenkins_rel {
+        counter accept
+    }
+
+    chain jenkins_inv {
+        counter drop
+    }
+
+    chain jenkins_new {
+        ip saddr ${ssh_ip} tcp dport ${ssh_port} counter name cnt_ssh_new accept
+        tcp dport { 80, 443 } counter name cnt_http_new accept
+    }
+
+}
+EOF
+# Load configuration file
+nft -f /etc/sysconfig/jenkins.nft
+# Generate config file for persistence across reboots
+nft list ruleset > /etc/sysconfig/nftables.conf
+
+# Set SELinux to enforcing mode
+sed -i "s/^SELINUX=.*$/SELINUX=enforcing/" /etc/selinux/config
+setenforce 1
+# Required to support nginx reverse proxy
+setsebool -P httpd_can_network_relay 1
+# Add SSH port to SELinux policy
+semanage port -a -t ssh_port_t -p tcp ${ssh_port} 
+
+# Set hostname and local DNS
+hostnamectl set-hostname jenkins
+echo "127.0.0.10 jenkins" >> /etc/hosts
+
+# Install Jenkins and Java (dependency)
+# Reference: https://www.jenkins.io/doc/tutorials/tutorial-for-installing-jenkins-on-AWS/
+yum install yum-utils -y 
+yum-config-manager --add-repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+yum upgrade -y
+yum install java-21-amazon-corretto -y
+yum install jenkins -y
+systemctl is-enabled --quiet jenkins || systemctl enable jenkins
+systemctl is-active --quiet jenkins || systemctl start jenkins
+
+# Install Git
+yum install git -y
+
+# Install Terraform
+# Reference: https://developer.hashicorp.com/terraform/install
+yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+yum install terraform -y 
+
+# Install kubectl
+curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.23.6/bin/linux/amd64/kubectl
+chmod +x ./kubectl
+mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
+
+# Install nginx
+yum install nginx -y
+systemctl is-enabled --quiet nginx || systemctl enable nginx
+systemctl is-active --quiet nginx || systemctl start nginx
+# Configure nginx as a reverse proxy
+cat > /etc/nginx/conf.d/${domain_name}.conf << EOF
+server {
+
+    listen 80 default_server;
+    server_name ${domain_name};
+
+    location / {
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version  1.1;
+        proxy_request_buffering  off;
+        proxy_buffering  off;
+        proxy_pass http://localhost:8080;
+        proxy_redirect http://localhost:8080 https://${domain_name};
+    }
+}
+EOF
+systemctl reload nginx
+
+# Install and configure Certbot for SSL/TLS certificate
+yum install python3 augeas-libs -y
+python3 -m venv /opt/certbot/
+/opt/certbot/bin/pip install --upgrade pip
+yes | /opt/certbot/bin/pip install certbot certbot-nginx
+/opt/certbot/bin/certbot --nginx --non-interactive -d ${domain_name} --email ${certbot_email} --agree-tos
+# Create systemd service and timer to auto-renew Certbot
+cat >/lib/systemd/system/certbot-custom.service << EOF 
+[Unit]
+Description="Certbot - custom"
+[Service]
+Type=oneshot
+ExecStart=/opt/certbot/bin/certbot -q renew
+PrivateTmp=true
+EOF
+systemctl enable certbot-custom.service
+systemctl start certbot-custom.service
+cat >/lib/systemd/system/certbot-custom.timer << EOF 
+[Unit]
+Description=Run certbot twice daily
+[Timer]
+OnCalendar=*-*-* 00,12:00:00
+RandomizedDelaySec=43200
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
+systemctl enable certbot-custom.timer
+systemctl start certbot-custom.timer
+
+# Install and configure Fail2ban
+yum install fail2ban -y
+systemctl is-enabled --quiet fail2ban || systemctl enable fail2ban
+systemctl is-active --quiet fail2ban || systemctl start fail2ban
+# SSH jail
+cat > /etc/fail2ban/jail.d/sshd.local << EOF
+[sshd]
+enabled = true
+port = ${ssh_port} 
+backend = systemd
+EOF
+systemctl restart fail2ban
