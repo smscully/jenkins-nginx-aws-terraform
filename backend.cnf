@@ -1,0 +1,5 @@
+bucket = "your-s3-bucket"
+key = "jenkins"
+region = "us-east-1"
+dynamodb_table = "your-dynamodb-table"
+encrypt = true
