@@ -1,5 +1,5 @@
 bucket = "your-s3-bucket"
-key = "jenkins"
+key = "jenkins-terraform-nginx-aws"
 region = "us-east-1"
 dynamodb_table = "your-dynamodb-table"
 encrypt = true

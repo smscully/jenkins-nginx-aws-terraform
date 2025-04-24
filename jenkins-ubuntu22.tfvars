@@ -24,7 +24,7 @@ security_groups = {
     description = "Security Group for Jenkins Server"
     rules = {
       "security-group-pub-web-01-rule-1" = {
-        cidr_ipv4 = "0.0.0.0/0"
+        cidr_ipv4                    = "0.0.0.0/0"
         referenced_security_group_id = null
         from_port                    = "2222"
         to_port                      = "2222"
@@ -55,14 +55,6 @@ security_groups = {
         ip_protocol                  = "-1"
         ingress                      = false
       }
-      "security-group-jenkins-rule-5" = {
-        cidr_ipv4                    = "0.0.0.0/0"
-        referenced_security_group_id = null
-        from_port                    = "8080"
-        to_port                      = "8080"
-        ip_protocol                  = "tcp"
-        ingress                      = true
-      }
     }
   }
 }
@@ -77,8 +69,8 @@ network_acls = {
         protocol    = "tcp"
         rule_action = "allow"
         cidr_block  = "0.0.0.0/0"
-        from_port = 2222
-        to_port   = 2222
+        from_port   = 2222
+        to_port     = 2222
       }
       "network-acl-pub-rule-101" = {
         rule_number = "101"
@@ -86,8 +78,8 @@ network_acls = {
         protocol    = "tcp"
         rule_action = "allow"
         cidr_block  = "0.0.0.0/0"
-        from_port = 2222
-        to_port   = 2222
+        from_port   = 2222
+        to_port     = 2222
       }
       "network-acl-pub-rule-110" = {
         rule_number = "110"
@@ -181,9 +173,9 @@ instances = {
     vpc_security_group_ids = [
       "security-group-jenkins"
     ]
-    subnet_id = "subnet-pub-1a"
-    key_name  = "key-pair-01"
-    ssh_ip = "0.0.0.0/0"
+    subnet_id     = "subnet-pub-1a"
+    key_name      = "key-pair-01"
+    ssh_ip        = "0.0.0.0/0"
     ssh_port      = "2222"
     domain_name   = "jenkins-ubuntu22.russetleaf.com"
     certbot_email = "jenkins@russetleaf.com"
