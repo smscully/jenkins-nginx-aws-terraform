@@ -85,7 +85,7 @@ While most of the variables correspond to standard AWS Terraform module attribut
 To run the script, follow standard Terraform practices by navigating to the directory that holds the root `main.tf` script, then running the commands to initialize and apply the script. In this case, because the script employs a .tfvars file, the `-var-file` command line option is used.
 
 ```bash
-terraform init
+terraform init -backend-config="backend.cnf"
 terraform plan -var-file="jenkins-ubuntu22.tfvars"
 terraform apply -var-file="jenkins-ubuntu22.tfvars"
 ```
