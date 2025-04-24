@@ -167,8 +167,8 @@ route_tables = {
 ########################################
 key_pairs = {
   "key-pair-01" = {
-    key_name   = "your-key-ed25519"
-    public_key = "~/.ssh/your-key-ed25519.pub"
+    key_name   = "aws-test-env-ed25519"
+    public_key = "~/.ssh/aws-test-env-ed25519.pub"
   }
 }
 
