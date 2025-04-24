@@ -1,18 +1,18 @@
 ########################################
 # Project Variable Assignments
 ########################################
-project = "jenkins-terraform-ubuntu2"
+project = "jenkins-terraform-ubuntu22"
 env     = "Dev"
 region  = "us-east-1"
 
 ########################################
 # Networking Module Variable Assignments
 ########################################
-cidr_vpc = "10.100.0.0/16"
+cidr_vpc = "10.0.0.0/16"
 
 subnets = {
   "subnet-pub-1a" = {
-    cidr_block              = "10.100.10.0/24"
+    cidr_block              = "10.0.10.0/24"
     availability_zone       = "us-east-1a"
     map_public_ip_on_launch = true
     route_table             = "route-table-pub"
