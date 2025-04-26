@@ -23,7 +23,7 @@ security_groups = {
   "security-group-jenkins" = {
     description = "Security Group for Jenkins Server"
     rules = {
-      "security-group-pub-web-01-rule-1" = {
+      "security-group-jenkins-rule-1" = {
         cidr_ipv4                    = "0.0.0.0/0"
         referenced_security_group_id = null
         from_port                    = "2222"
@@ -31,7 +31,7 @@ security_groups = {
         ip_protocol                  = "tcp"
         ingress                      = true
       }
-      "security-group-pub-web-01-rule-2" = {
+      "security-group-jenkins-rule-2" = {
         cidr_ipv4                    = "0.0.0.0/0"
         referenced_security_group_id = null
         from_port                    = "80"
@@ -39,7 +39,7 @@ security_groups = {
         ip_protocol                  = "tcp"
         ingress                      = true
       }
-      "security-group-pub-web-01-rule-3" = {
+      "security-group-jenkins-rule-3" = {
         cidr_ipv4                    = "0.0.0.0/0"
         referenced_security_group_id = null
         from_port                    = "443"
@@ -47,7 +47,7 @@ security_groups = {
         ip_protocol                  = "tcp"
         ingress                      = true
       }
-      "security-group-pub-web-01-rule-4" = {
+      "security-group-jenkins-rule-4" = {
         cidr_ipv4                    = "0.0.0.0/0"
         referenced_security_group_id = null
         from_port                    = "0"
