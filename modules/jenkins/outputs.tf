@@ -2,7 +2,7 @@
 # Jenkins EC2 Module Outputs
 ########################################
 output "instance_data" {
-  description = "Instance Data"
+  description = "Jenkins Instance Data"
   value = {
     for instance in aws_instance.instance : instance.tags["name"] => {
       id          = instance.id
