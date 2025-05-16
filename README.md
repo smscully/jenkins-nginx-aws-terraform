@@ -83,6 +83,7 @@ While most of the variables correspond to standard AWS Terraform module attribut
 + Jenkins EC2 Module
   + public_key: The location on the local machine of the SSH public key.
   + ami: Reference to the Amazon Machine Image. The module's datasources.tf file contains two possible AMIs, Ubuntu 22 (ubuntu_22) or Amazon Linux 2023 (amazon_linux_2023).
+  + http_tokens: Two values are valid: optional/required. Following best security practices, "required" should be used, which requires the use of Instance Metadata Service Version 2 (IMDSv2).
   + ssh_ip: The SSH IPv4 address that will be allowed by OpenSSH, Fail2ban, and the instance firewall. This value must correspond with the SSH IPv4 address allowed by the Security Groups and NACLs. The value is currently set to "0.0.0.0/0" but for increased security should be modified throughout to a more specific address.
   + ssh_port: The SSH port that will be allowed by OpenSSH, Fail2ban, and the instance firewall. This value must correspond with the SSH port allowed by the Security Groups and NACLs. 
   + domain_name: The domain name for the Jenkins server, which must be a subdomain of the domain managed by the AWS Hosted Zone.
@@ -128,6 +129,9 @@ To confirm the certificate will be renewed properly, the following commands simu
  
 + Ubuntu 22: `sudo certbot renew --dry-run`
 + AL2023: `sudo /opt/certbot/bin/certbot renew --dry-run`
+
+### Step 8. Confirm Website Works
+Using a browser, for each instance, navigate to the website identified by the `domain_name` variable and confirm the Jenkins Getting Started page is displayed using SSL/TLS. 
 
 ## License
 Licensed under the [GNU General Public License v3.0](./LICENSE).
