@@ -1,4 +1,4 @@
-# Jenkins EC2 Module
+# Jenkins Module
 
 # Deploys AWS EC2 instances from images listed in datasources.tf, runs an AWS User Data script to apply security measures and install Jenkins, and uploads public keys to enable access to each instance.
 
@@ -45,7 +45,7 @@ data "template_file" "user_data" {
 }
 
 ########################################
-# Create Instance
+# Create Instance with Jenkins
 ########################################
 resource "aws_instance" "instance" {
 

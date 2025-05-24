@@ -1,5 +1,5 @@
 ########################################
-# Jenkins EC2 Module Variables
+# Jenkins Module Variables
 ########################################
 variable "project" {
   type = string

@@ -125,10 +125,11 @@ By default, the Ubuntu 22 APT install of Certbot creates a systemd timer to chec
 sudo tail /var/log/letsencrypt/letsencrypt.log
 ```
 
-To confirm the certificate will be renewed properly, the following commands simulate the Certbot renewal process:
+To confirm the certificate will be renewed properly, the following command simulates the Certbot renewal process:
  
-+ Ubuntu 22: `sudo certbot renew --dry-run`
-+ AL2023: `sudo /opt/certbot/bin/certbot renew --dry-run`
+```bash
+sudo certbot renew --dry-run
+```
 
 ### Step 8. Confirm Website Works
 Using a browser, for each instance, navigate to the website identified by the `domain_name` variable and confirm the Jenkins Getting Started page is displayed using SSL/TLS. 

@@ -143,18 +143,21 @@ EOF
 systemctl reload nginx
 
 # Install and configure Certbot for SSL/TLS certificate
-yum install python3 augeas-libs -y
-python3 -m venv /opt/certbot/
-/opt/certbot/bin/pip install --upgrade pip
-yes | /opt/certbot/bin/pip install certbot certbot-nginx
-/opt/certbot/bin/certbot --nginx --non-interactive -d ${domain_name} --email ${certbot_email} --agree-tos
+yum install certbot -y
+yum install python3-certbot-nginx -y
+certbot --nginx --non-interactive -d ${domain_name} -m ${certbot_email} --agree-tos
+#yum install python3 augeas-libs -y
+#python3 -m venv /opt/certbot/
+#/opt/certbot/bin/pip install --upgrade pip
+#yes | /opt/certbot/bin/pip install certbot certbot-nginx
+#/opt/certbot/bin/certbot --nginx --non-interactive -d ${domain_name} --email ${certbot_email} --agree-tos
 # Create systemd service and timer to auto-renew Certbot
 cat >/lib/systemd/system/certbot-custom.service << EOF 
 [Unit]
 Description="Certbot - custom"
 [Service]
 Type=oneshot
-ExecStart=/opt/certbot/bin/certbot -q renew
+ExecStart=/usr/bin/certbot -q renew
 PrivateTmp=true
 EOF
 systemctl enable certbot-custom.service
